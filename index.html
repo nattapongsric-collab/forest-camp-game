@@ -109,6 +109,26 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
+		<script>
+		// โหลด index.wasm.gz (ไฟล์บีบอัด < 25MB ให้อัปผ่านหน้าเว็บ GitHub ได้) แล้วแตกไฟล์ในเบราว์เซอร์
+		// ถ้าไม่มี index.wasm.gz จะใช้ index.wasm ตามปกติ
+		(function () {
+			const origFetch = window.fetch.bind(window);
+			window.fetch = async function (input, init) {
+				const url = typeof input === 'string' ? input : (input && input.url) || '';
+				if (!/(^|\/)index\.wasm(\?|$)/.test(url)) return origFetch(input, init);
+				let gz;
+				try { gz = await origFetch(url.replace('index.wasm', 'index.wasm.gz'), init); } catch (e) { gz = null; }
+				if (!gz || !gz.ok) return origFetch(input, init);
+				let bytes = new Uint8Array(await gz.arrayBuffer());
+				if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+					const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+					bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+				}
+				return new Response(bytes, { status: 200, headers: { 'Content-Type': 'application/wasm', 'Content-Length': String(bytes.length) } });
+			};
+		})();
+		</script>
 		<script src="index.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":19572,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
